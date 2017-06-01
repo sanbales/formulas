@@ -23,9 +23,17 @@ ufuncs = {item: getattr(np, item) for item in dir(np)
           if isinstance(getattr(np, item), np.ufunc)}
 
 
-def is_number(number):
+def is_number(value):
+    """
+    Check to see if value is numeric.
+
+    :param value: the value to check.
+    :return: True if value can be cast as a number.
+    :rtype: bool
+
+    """
     try:
-        float(number)
+        float(value)
     except (ValueError, TypeError):
         return False
     return True
@@ -54,6 +62,126 @@ def xmin(*args):
 def average(*args):
     l = list(flatten(args))
     return sum(l) / len(l)
+
+
+def match(lookup_value, lookup_array, match_type=1):
+    """
+    Searches for a specified item in a range of cells,
+    and then returns the relative position of that item in the range.
+
+    :param lookup_value: The value that you want to match in lookup_array.
+    :param lookup_array: The range of cells being searched.
+    :param match_type: Specifies how Excel matches lookup_value with values
+        in lookup_array. (default: 1)
+
+    :return: The index of the first instance of lookup_value in lookup_array.
+
+    """
+    def type_convert(val):
+        if isinstance(val, str):
+            val = val.upper()
+        elif is_number(val):
+            val = float(val)
+        return val
+
+    lookup_value = type_convert(lookup_value)
+
+    if match_type == 1:
+        # Verify ascending sort
+        pos_max = -1
+        for i in range((len(lookup_array))):
+            current = type_convert(lookup_array[i])
+            if i is not len(lookup_array)-1 and current > type_convert(lookup_array[i+1]):
+                raise ValueError('for match_type 0, lookup_array must be sorted ascending')
+            if current <= lookup_value:
+                pos_max = i
+        if pos_max == -1:
+            raise ValueError('No result in lookup_array for match_type 0')
+        # Excel starts at 1
+        return pos_max + 1
+
+    elif match_type == 0:
+        # No string wildcard
+        return [type_convert(x) for x in lookup_array].index(lookup_value) + 1
+
+    elif match_type == -1:
+        # Verify descending sort
+        pos_min = -1
+        for i in range((len(lookup_array))):
+            current = type_convert(lookup_array[i])
+            if i is not len(lookup_array)-1 and current < type_convert(lookup_array[i+1]):
+                raise ValueError('For match_type 0, lookup_array must be sorted descending')
+            if current >= lookup_value:
+                pos_min = i
+        if pos_min == -1:
+            raise Exception('no result in lookup_array for match_type 0')
+        # Excel starts at 1
+        return pos_min + 1
+
+
+def lookup(lookup_value, lookup_vector, result_vector):
+    """
+    The vector form of LOOKUP looks in a one-row or one-column range (known as a vector) for a
+    value and returns a value from the same position in a second one-row or one-column range.
+
+    :param lookup_value: A value that LOOKUP searches for in the first vector.
+    :param lookup_vector: A range that contains only one row or one column.
+    :param result_vector: A range that contains only one row or column.
+
+    :type lookup_value: a number, text, a logical value, or a name or reference that refers to a value.
+    :type lookup_vector: an array containing text, numbers, or logical values.
+    :type result_vector: must be the same size as lookup_vector.
+
+    :return:
+    """
+    pass
+
+
+def hlookup(lookup_value, table_array, row_index_num, range_lookup=True):
+    return vlookup(lookup_value, np.transpose(table_array), row_index_num, range_lookup)
+
+
+def vlookup(lookup_value, table_array, col_index_num, range_lookup=True):
+    """
+    Use VLOOKUP, one of the lookup and reference functions, when you need to find
+    things in a table or a range by row. For example, look up a price of an
+    automotive part by the part number.
+
+    In its simplest form, the VLOOKUP function says:
+
+    =VLOOKUP(Value you want to look up, range where you want to lookup the value,
+        the column number in the range containing the return value,
+        Exact Match or Approximate Match – indicated as 0/FALSE or 1/TRUE).
+
+    :param lookup_value: A value that VLOOKUP searches for in the first column.
+    :param table_array: A range that contains the value being looked up, and the target value.
+    :param col_index_num: The number of columns to look to the right of, 1 is looked up value.
+    :param range_lookup: Search for an approximate match? (default: True)
+    :return:
+
+    """
+    if isinstance(lookup_value, (list, tuple, np.ndarray)):
+        lookup_value = lookup_value[0]
+
+    if range_lookup:
+        idx = -1
+        if is_number(lookup_value):
+            for idx in range(len(table_array) - 1):
+                if all((table_array[idx][0] <= lookup_value,
+                        table_array[idx + 1][0] > lookup_value)):
+                    return table_array[idx][col_index_num - 1]
+        else:
+            for idx in range(len(table_array) - 1):
+                if all((table_array[idx][0],
+                        table_array[idx+1][0])):
+                    return table_array[idx][col_index_num - 1]
+        return table_array[idx + 1][col_index_num - 1]
+
+    else:
+        values = [row[0] for row in table_array]
+        if lookup_value in values:
+            return table_array[values.index(lookup_value)][col_index_num - 1]
+    return None
 
 
 # noinspection PyUnusedLocal
@@ -90,7 +218,16 @@ def raise_errors(*args):
 
 
 def call_ufunc(*args, ufunc=''):
-    """Helps call a numpy universal function (ufunc)."""
+    """
+    Calls a numpy universal function (ufunc) with the specified arguments.
+
+    :param args: arguments to be passed to the ufunc.
+    :param ufunc: the numpy universal function to wrap.
+    :type args: tuple
+    :type ufunc: :class:`numpy.ufunc`
+    :return: result from ufunc for given arguments
+
+    """
 
     def safe_eval(f, *vals):
         vals = [0. if val is EMPTY else val for val in vals]
@@ -156,6 +293,7 @@ FUNCTIONS.update({
     'COSH': wrap_func('cosh'),
     'DEGREES': wrap_func('degrees'),
     'EXP': wrap_func('exp'),
+    'HLOOKUP': wrap_func(hlookup),
     'IF': wrap_func(lambda c, x=True, y=False: np.where(c, x, y)),
     'IFERROR': iferror,
     'INT': wrap_func(int),
@@ -163,6 +301,8 @@ FUNCTIONS.update({
     'ISERROR': iserror,
     'LOG': wrap_func('log10'),
     'LN': wrap_func('log'),
+    'LOOKUP': wrap_func(lookup),
+    'MATCH': wrap_func(match),
     'MAX': wrap_func(xmax),
     'MIN': wrap_func(xmin),
     'MOD': wrap_func('mod'),
@@ -175,4 +315,5 @@ FUNCTIONS.update({
     'SUM': wrap_func(xsum),
     'TAN': wrap_func('tan'),
     'TANH': wrap_func('tanh'),
+    'VLOOKUP': wrap_func(vlookup),
 })
