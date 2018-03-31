@@ -64,3 +64,6 @@ target/
 
 # Excel
 ~$*.xls*
+
+# Notebooks
+.ipynb_checkpoints
