@@ -110,6 +110,35 @@ def average(*args):
     return sum(l) / len(l)
 
 
+def lookup(lookup_value, lookup_vector, result_vector=None):
+    """
+    The vector form of LOOKUP looks in a one-row or one-column range (known as a vector) for a
+    value and returns a value from the same position in a second one-row or one-column range.
+
+    :param lookup_value: A value that LOOKUP searches for in the first vector.
+    :param lookup_vector: A range that contains only one row or one column.
+    :param result_vector: A range that contains only one row or column.
+
+    :type lookup_value: a number, text, a logical value, or a name or reference that refers to a value.
+    :type lookup_vector: an array containing text, numbers, or logical values.
+    :type result_vector: must be the same size as lookup_vector.
+
+    :return:
+    """
+    print('\n\n\n')
+    print('LOOKUP({}, {}, {})'.format(lookup_value, lookup_vector, result_vector))
+
+    result_vector = lookup_vector if result_vector is None else result_vector
+
+    index = np.where(np.ravel(lookup_vector) == np.ravel(lookup_value))[0]
+    print('INDEX = {}'.format(index))
+    print('\n\n\n')
+    if len(index) > 0:
+        return np.ravel(result_vector)[index[0]]
+    else:
+        return Error.errors['#N/A']
+
+
 def match(lookup_value, lookup_array, match_type=1):
     """
     Searches for a specified item in a range of cells,
@@ -163,24 +192,6 @@ def match(lookup_value, lookup_array, match_type=1):
             raise Exception('no result in lookup_array for match_type 0')
         # Excel starts at 1
         return pos_min + 1
-
-
-def lookup(lookup_value, lookup_vector, result_vector):
-    """
-    The vector form of LOOKUP looks in a one-row or one-column range (known as a vector) for a
-    value and returns a value from the same position in a second one-row or one-column range.
-
-    :param lookup_value: A value that LOOKUP searches for in the first vector.
-    :param lookup_vector: A range that contains only one row or one column.
-    :param result_vector: A range that contains only one row or column.
-
-    :type lookup_value: a number, text, a logical value, or a name or reference that refers to a value.
-    :type lookup_vector: an array containing text, numbers, or logical values.
-    :type result_vector: must be the same size as lookup_vector.
-
-    :return:
-    """
-    pass
 
 
 def hlookup(lookup_value, table_array, row_index_num, range_lookup=True):
@@ -267,10 +278,10 @@ def call_ufunc(ufunc, *args):
     """
     Calls a numpy universal function (ufunc) with the specified arguments.
 
-    :param args: arguments to be passed to the ufunc.
     :param ufunc: the numpy universal function to wrap.
-    :type args: tuple
+    :param args: arguments to be passed to the ufunc.
     :type ufunc: :class:`numpy.ufunc`
+    :type args: tuple
     :return: result from ufunc for given arguments
 
     """
